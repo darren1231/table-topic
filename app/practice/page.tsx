@@ -81,24 +81,31 @@ export default function PracticePage() {
     setStep('recording');
   }
 
-  function startPrepTimer() {
-    setRec({ phase: 'preparing', countdown: PREP_TIME, elapsed: 0 });
-    let remaining = PREP_TIME;
-    timerRef.current = setInterval(() => {
-      remaining--;
-      if (remaining <= 0) {
-        clearTimer();
-        startRecording();
-      } else {
-        setRec((r) => ({ ...r, countdown: remaining }));
-      }
-    }, 1000);
-  }
-
-  async function startRecording() {
+  async function prepareRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      setError('');
+      setRec({ phase: 'preparing', countdown: PREP_TIME, elapsed: 0 });
+      let remaining = PREP_TIME;
+      timerRef.current = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearTimer();
+          startRecording(stream);
+        } else {
+          setRec((r) => ({ ...r, countdown: remaining }));
+        }
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      setError('無法存取麥克風，請確認瀏覽器已授權。');
+      setRec({ phase: 'idle', countdown: PREP_TIME, elapsed: 0 });
+    }
+  }
+
+  async function startRecording(stream: MediaStream) {
+    try {
       chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mediaRecorderRef.current = mr;
@@ -121,8 +128,10 @@ export default function PracticePage() {
           setRec((r) => ({ ...r, elapsed, countdown: ANSWER_TIME - elapsed }));
         }
       }, 1000);
-    } catch {
-      setError('無法存取麥克風，請確認瀏覽器已授權。');
+    } catch (err) {
+      console.error(err);
+      stream.getTracks().forEach((t) => t.stop());
+      setError('無法開始錄音，請確認裝置支援錄音功能。');
       setRec({ phase: 'idle', countdown: PREP_TIME, elapsed: 0 });
     }
   }
@@ -328,7 +337,7 @@ export default function PracticePage() {
                 點擊「開始準備」後會有 {PREP_TIME} 秒準備時間，接著自動開始錄音，最長 {ANSWER_TIME} 秒。
               </p>
               {error && <div className="alert alert-error" style={{ marginBottom: '16px' }}>{error}</div>}
-              <button className="btn-primary" style={{ fontSize: '1rem', padding: '12px 32px' }} onClick={startPrepTimer}>
+              <button className="btn-primary" style={{ fontSize: '1rem', padding: '12px 32px' }} onClick={prepareRecording}>
                 ▶ 開始準備
               </button>
             </>
